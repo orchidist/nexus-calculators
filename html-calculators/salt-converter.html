@@ -75,6 +75,7 @@
                             }
                         }
                     });
+                    return true;
                 }
 
                 function populateRatios() {
@@ -94,45 +95,79 @@
                     } else {
                         $ratioSelector.show();
                     }
+
+                    return true;
+                }
+
+                function calculateYields(){
+                    var rawMass = $("#rawMass").val();
+                    var sourceMass = $("#mass").val();
+                    var alkaloidName = $("#alkaloid :selected").val();
+                    var anionSourceStoichiometry = $("#stoichiometry :selected").val();
+                    var anionSourceName = $("#anion :selected").val();
+
+                    var alkaloidData = dataset["alkaloids"][alkaloidName];
+                    var anionSourceData = dataset["anions"][anionSourceName];
+
+                    var productMolarMass = alkaloidData["molarMass"] * anionSourceStoichiometry + anionSourceData["molarMass"];
+                    var productMoles = sourceMass / productMolarMass;
+                    var freebaseMoles = productMoles * anionSourceStoichiometry;
+                    var freebaseMass = freebaseMoles * alkaloidData["molarMass"];
+
+                    var percentYield = 100 * freebaseMass / rawMass;
+                    
+                    $("#yieldData").html(`
+                    <span class="bold">Yield:</span> ${percentYield.toPrecision(2)} % freebase ${alkaloidName}
+                    `);
                 }
 
                 populateRatios();
                 convertSalts();
+                calculateYields();
 
-                $("#converterForm").change(convertSalts);
+                $("#converterForm").change(function() {convertSalts();  calculateYields();});
                 $("#anion").change(populateRatios);
                 $('#converterForm').submit(false);
             });
         </script>
         <style>
+            label, .bold {font-weight: bold;}
+            .formDiv {padding: 10px; }
+            #outputTable { padding-top: 30px; padding-left: 5px; }
             #outputTable th { text-align: left};
             #outputTable tbody tr td:first-child {font-family: 'Courier New', Courier, monospace};
         </style>
     </head>
     <body>
         <form id="converterForm">
-            <fieldset id="inputFields">
+            <div class="formDiv">
                 <label for="alkaloid">Compound</label>
                 <select id="alkaloid" name="alkaloid"></select>
                 <select id="stoichiometry">
                     <option value="1" selected>1:1</option>
                 </select>
                 <select id="anion" name="anion"></select>
-                <label for="mass">Mass</label>
-                <input id="mass" type="number" value="1.000">g</form>
-            </fieldset>
+            </div>
+            <div class="formDiv">
+                <label for="rawMass">Raw material mass</label>
+                <input id="rawMass" type="number" value="100.000"> g
+            </div>
+            <div class="formDiv">
+                <label for="mass">Product mass</label>
+                <input id="mass" type="number" value="1.000"> g
+            </div>
+            <div id="yieldData" class="formDiv"></div>
         </form>
-
+        <div>
         <table id="outputTable">
             <thead>
                 <tr>
-                    <th>Mass (<span id="unit">g</span>)</th>
+                    <th width="180px">Mass (<span id="unit">g</span>)</th>
                     <th>Compound</th>
                 </tr>
             </thead>
-            <tbody>
-
-            </tbody>
+            <tbody></tbody>
         </table>
+        </div>
     </body>
 </html>
