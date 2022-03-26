@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Salt/Freebase Converter</title>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+        <script id="dataset" type="applialkaloid/json">
+            {
+                "alkaloids": {
+                    "n,n-DMT": { "molarMass": 188.27 },
+                    "mescaline": { "molarMass": 211.26 },
+                    "harmine": { "molarMass": 212.25 },
+                    "harmaline": { "molarMass": 214.29 },
+                    "tetrahydroharman": { "molarMass": 186.25}
+                },
+                "anions": {
+                    "freebase": {"molarMass": 0, "protons": 1 },
+                    "acetate": { "molarMass": 60.05, "protons": 1 },
+                    "ascorbate": { "molarMass": 176.12412, "protons": 1 },
+                    "benzoate": { "molarMass": 122.12134, "protons": 1 },
+                    "carbonate": { "molarMass": 62.02478, "protons": 1 },
+                    "citrate": { "molarMass": 192.12, "protons": 3 },
+                    "fumarate": { "molarMass": 116.0722, "protons": 2 },
+                    "hydrochloride": { "molarMass": 36.46, "protons": 1 },
+                    "malate": { "molarMass": 134.09, "protons": 2 },
+                    "maleate": { "molarMass": 116.072, "protons": 2 },
+                    "malonate": { "molarMass": 104.061, "protons": 2 },
+                    "succinate": { "molarMass": 118.09, "protons": 2 },
+                    "sulfate": { "molarMass": 98.08, "protons": 1 }, 
+                    "tartarate": {"molarMass": 150.08, "protons": 2}
+                }
+            }
+        </script>
+        <script type="text/javascript">
+            $(document).ready(function(){
+                var dataset = JSON.parse($("#dataset").text());
+
+                $.each(dataset["alkaloids"], function(key){
+                    $("#alkaloid").append(new Option(key, key));
+                });
+                $.each(dataset["anions"], function(key){
+                    $("#anion").append(new Option(key, key));
+                });
+
+                function convertSalts() {
+                    var sourceMass = $("#mass").val();
+                    var alkaloidName = $("#alkaloid :selected").val();
+                    var anionSourceStoichiometry = $("#stoichiometry :selected").val();
+                    var anionSourceName = $("#anion :selected").val();
+
+                    var alkaloidData = dataset["alkaloids"][alkaloidName];
+                    var anionSourceData = dataset["anions"][anionSourceName];
+                    
+                    $("#outputTable tbody tr").remove();
+                    $.each(dataset["anions"], function(anionTargetName, anionTargetData){
+                        if (anionTargetName != anionSourceName) {
+                            for(var targetAnionStoichiometry = 1; targetAnionStoichiometry<=anionTargetData["protons"]; targetAnionStoichiometry++) {
+                                var molarRatio = anionSourceStoichiometry / targetAnionStoichiometry;
+                                var ratioString = (targetAnionStoichiometry == 1) ? " " : ` ${targetAnionStoichiometry}:1 `;
+
+                                var sourceMolarMass = alkaloidData["molarMass"] * anionSourceStoichiometry + anionSourceData["molarMass"];
+                                var targetMolarMass = alkaloidData["molarMass"] * targetAnionStoichiometry + anionTargetData["molarMass"];
+                                
+                                var targetMoles = sourceMass / sourceMolarMass;
+
+                                var targetMass = targetMoles * molarRatio * targetMolarMass ;
+
+                                var targetCompound = `${alkaloidName}${ratioString}${anionTargetName}`;
+
+                                $("#outputTable tbody").append(`
+                                    <tr>
+                                        <td class="massOutput">${targetMass.toPrecision(4)}</td>
+                                        <td>${targetCompound}</td>
+                                    </tr>
+                                `);
+                            }
+                        }
+                    });
+                }
+
+                function populateRatios() {
+                    var anionName = $("#anion :selected").val();
+                    var protons = dataset["anions"][anionName]["protons"];
+                    var $ratioSelector = $("#stoichiometry");
+
+                    $ratioSelector.children(":not(:first-child)").remove();
+                    $ratioSelector.children().prop("selected", true);
+
+                    for(var i=2; i<=protons; i++){
+                        $ratioSelector.append(`<option value=${i}>${i}:1</option>`);
+                    }
+
+                    if (protons < 2){
+                        $ratioSelector.hide();
+                    } else {
+                        $ratioSelector.show();
+                    }
+                }
+
+                populateRatios();
+                convertSalts();
+
+                $("#converterForm").change(convertSalts);
+                $("#anion").change(populateRatios);
+            });
+        </script>
+        <style>
+            #outputTable th { text-align: left};
+            #outputTable tbody tr td:first-child {font-family: 'Courier New', Courier, monospace};
+        </style>
+    </head>
+    <body>
+        <form id="converterForm">
+            <fieldset id="inputFields">
+                <label for="alkaloid">Compound</label>
+                <select id="alkaloid" name="alkaloid"></select>
+                <select id="stoichiometry">
+                    <option value="1" selected>1:1</option>
+                </select>
+                <select id="anion" name="anion"></select>
+                <label for="mass">Mass</label>
+                <input id="mass" type="number" value="1.000">g</form>
+            </fieldset>
+        </form>
+
+        <table id="outputTable">
+            <thead>
+                <tr>
+                    <th>Mass (<span id="unit">g</span>)</th>
+                    <th>Compound</th>
+                </tr>
+            </thead>
+            <tbody>
+
+            </tbody>
+        </table>
+    </body>
+</html>
