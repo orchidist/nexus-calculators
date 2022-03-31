@@ -33,6 +33,8 @@
         </script>
         <script type="text/javascript">
             $(document).ready(function(){
+                const waterMMass = 18.015;
+
                 var dataset = JSON.parse($("#dataset").text());
 
                 $.each(dataset["alkaloids"], function(key){
@@ -42,35 +44,52 @@
                     $("#anion").append(new Option(key, key));
                 });
 
+                function convertSalt(massA, alkaloidMMass, anionAMMass, ratioA, hydrationA, anionBMMass, ratioB ,hydrationB) {
+                    var molarMassA = alkaloidMMass * ratioA + anionAMMass + waterMMass * hydrationA;
+                    var molarMassB = alkaloidMMass * ratioB + anionBMMass + waterMMass * hydrationB;
+
+                    var molesA = massA / molarMassA;
+                    var alkaloidMolesA = molesA * ratioA;
+                    var molesB = alkaloidMolesA / ratioB;
+                    var massB = molesB * molarMassB;
+
+                    return massB;
+                }
+
                 function convertSalts() {
                     var sourceMass = $("#mass").val();
                     var alkaloidName = $("#alkaloid :selected").val();
                     var anionSourceStoichiometry = $("#stoichiometry :selected").val();
                     var anionSourceName = $("#anion :selected").val();
+                    var sourceHydration = $("#hydration").val();
 
-                    var alkaloidData = dataset["alkaloids"][alkaloidName];
-                    var anionSourceData = dataset["anions"][anionSourceName];
+                    var alkaloidData = dataset.alkaloids[alkaloidName];
+                    var anionSourceData = dataset.anions[anionSourceName];
                     
                     $("#outputTable tbody tr").remove();
                     $.each(dataset["anions"], function(anionTargetName, anionTargetData){
                         if (anionTargetName != anionSourceName) {
-                            for(var targetAnionStoichiometry = 1; targetAnionStoichiometry<=anionTargetData["protons"]; targetAnionStoichiometry++) {
-                                var molarRatio = anionSourceStoichiometry / targetAnionStoichiometry;
+                            for(var targetAnionStoichiometry = 1; targetAnionStoichiometry<=anionTargetData.protons; targetAnionStoichiometry++) {
                                 var ratioString = (targetAnionStoichiometry == 1) ? " " : ` ${targetAnionStoichiometry}:1 `;
-
-                                var sourceMolarMass = alkaloidData["molarMass"] * anionSourceStoichiometry + anionSourceData["molarMass"];
-                                var targetMolarMass = alkaloidData["molarMass"] * targetAnionStoichiometry + anionTargetData["molarMass"];
-                                
-                                var targetMoles = sourceMass / sourceMolarMass;
-
-                                var targetMass = targetMoles * molarRatio * targetMolarMass ;
-
                                 var targetCompound = `${alkaloidName}${ratioString}${anionTargetName}`;
+                                var targetMass = convertSalt(
+                                    sourceMass, 
+                                    alkaloidData.molarMass,
+                                    anionSourceData.molarMass,
+                                    anionSourceStoichiometry,
+                                    sourceHydration,
+                                    anionTargetData.molarMass,
+                                    targetAnionStoichiometry,
+                                    0
+                                );
 
                                 $("#outputTable tbody").append(`
                                     <tr>
                                         <td class="massOutput">${targetMass.toPrecision(4)}</td>
                                         <td>${targetCompound}</td>
+                                        <td class="targetHydration">
+                                            <input id="${anionTargetName}-${targetAnionStoichiometry}-hydration" type="number"/>
+                                        <td>
                                     </tr>
                                 `);
                             }
@@ -81,7 +100,7 @@
 
                 function populateRatios() {
                     var anionName = $("#anion :selected").val();
-                    var protons = dataset["anions"][anionName]["protons"];
+                    var protons = dataset.anions[anionName].protons;
                     var $ratioSelector = $("#stoichiometry");
 
                     $ratioSelector.children(":not(:first-child)").remove();
@@ -103,17 +122,18 @@
                 function calculateYields(){
                     var rawMass = $("#rawMass").val();
                     var sourceMass = $("#mass").val();
+                    var sourceHydration = $("#hydration").val();
                     var alkaloidName = $("#alkaloid :selected").val();
                     var anionSourceStoichiometry = $("#stoichiometry :selected").val();
                     var anionSourceName = $("#anion :selected").val();
 
-                    var alkaloidData = dataset["alkaloids"][alkaloidName];
-                    var anionSourceData = dataset["anions"][anionSourceName];
+                    var alkaloidData = dataset.alkaloids[alkaloidName];
+                    var anionSourceData = dataset.anions[anionSourceName];
 
-                    var productMolarMass = alkaloidData["molarMass"] * anionSourceStoichiometry + anionSourceData["molarMass"];
+                    var productMolarMass = alkaloidData.molarMass * anionSourceStoichiometry + anionSourceData.molarMass + waterMMass * sourceHydration;
                     var productMoles = sourceMass / productMolarMass;
                     var freebaseMoles = productMoles * anionSourceStoichiometry;
-                    var freebaseMass = freebaseMoles * alkaloidData["molarMass"];
+                    var freebaseMass = freebaseMoles * alkaloidData.molarMass;
 
                     var percentYield = 100 * freebaseMass / rawMass;
                     
@@ -133,10 +153,11 @@
         </script>
         <style>
             label, .bold {font-weight: bold;}
+            label[for="hydration"] {font-weight: unset;}
             .formDiv {padding: 10px; }
             #outputTable { padding-top: 30px; padding-left: 5px; }
-            #outputTable th { text-align: left};
-            #outputTable tbody tr td:first-child {font-family: 'Courier New', Courier, monospace};
+            #outputTable th { text-align: left; }
+            .targetHydration { display: none }
         </style>
     </head>
     <body>
@@ -148,27 +169,33 @@
                     <option value="1" selected>1:1</option>
                 </select>
                 <select id="anion" name="anion"></select>
+                <input id="hydration" type="number" value="0" />
+                <label for="hydration">hydrate</label>
             </div>
             <div class="formDiv">
                 <label for="rawMass">Raw material mass</label>
-                <input id="rawMass" type="number" value="100.000"> g
+                <input id="rawMass" type="number" value="100.000" /> g
             </div>
             <div class="formDiv">
                 <label for="mass">Product mass</label>
-                <input id="mass" type="number" value="1.000"> g
+                <input id="mass" type="number" value="1.000" /> g
             </div>
             <div id="yieldData" class="formDiv"></div>
         </form>
         <div>
-        <table id="outputTable">
-            <thead>
-                <tr>
-                    <th width="180px">Mass (<span id="unit">g</span>)</th>
-                    <th>Compound</th>
-                </tr>
-            </thead>
-            <tbody></tbody>
-        </table>
+        <form id="outputHydrations">
+            <table id="outputTable">
+                <thead>
+                    <tr>
+                        <th width="180px">Mass (<span id="unit">g</span>)</th>
+                        <th>Compound</th>
+                        <!--TODO: integrate this into --> 
+                        <th class="targetHydration">Hydration</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </form>
         </div>
     </body>
 </html>
