@@ -170,7 +170,7 @@
                                 <td class="massOutput"></td>
                                 <td>${salt}</td>
                                 <td>
-                                    <input class="hydration" type="number" value=0 />
+                                    <input class="hydration" type="number" value="0" min="0" />
                                 </td>
                             </tr>
                             `);
@@ -264,11 +264,9 @@
             <div class="formDiv">
                 <label for="alkaloid">Compound</label>
                 <select id="alkaloid" name="alkaloid"></select>
-                <select id="stoichiometry">
-                    <option value="1" selected>1:1</option>
-                </select>
+                <select id="stoichiometry"></select>
                 <select id="acid" name="acid"></select>
-                <input id="hydration" type="number" value="0" />
+                <input id="hydration" type="number" value="0" min="0" />
                 <label for="hydration">hydrate</label>
             </div>
             <div class="formDiv">
