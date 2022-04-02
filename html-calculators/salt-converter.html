@@ -13,7 +13,7 @@
                     "harmaline": { "molarMass": 214.29 },
                     "tetrahydroharman": { "molarMass": 186.25}
                 },
-                "anions": {
+                "acids": {
                     "freebase": {"molarMass": 0, "protons": 1 },
                     "acetate": { "molarMass": 60.05, "protons": 1 },
                     "ascorbate": { "molarMass": 176.12412, "protons": 1 },
@@ -32,123 +32,223 @@
             }
         </script>
         <script type="text/javascript">
-            $(document).ready(function(){
-                const waterMMass = 18.015;
-
-                var dataset = JSON.parse($("#dataset").text());
-
-                $.each(dataset["alkaloids"], function(key){
-                    $("#alkaloid").append(new Option(key, key));
-                });
-                $.each(dataset["anions"], function(key){
-                    $("#anion").append(new Option(key, key));
-                });
-
-                function convertSalt(massA, alkaloidMMass, anionAMMass, ratioA, hydrationA, anionBMMass, ratioB ,hydrationB) {
-                    var molarMassA = alkaloidMMass * ratioA + anionAMMass + waterMMass * hydrationA;
-                    var molarMassB = alkaloidMMass * ratioB + anionBMMass + waterMMass * hydrationB;
-
-                    var molesA = massA / molarMassA;
-                    var alkaloidMolesA = molesA * ratioA;
-                    var molesB = alkaloidMolesA / ratioB;
-                    var massB = molesB * molarMassB;
-
-                    return massB;
+            const waterMMass = 18.015;
+            var dataset = JSON.parse($("#dataset").text());
+            
+            class Ion {
+                constructor(name, data) {
+                    this.name = name;
+                    this.molarMass = data.molarMass;
                 }
 
-                function convertSalts() {
-                    var sourceMass = $("#mass").val();
-                    var alkaloidName = $("#alkaloid :selected").val();
-                    var anionSourceStoichiometry = $("#stoichiometry :selected").val();
-                    var anionSourceName = $("#anion :selected").val();
-                    var sourceHydration = $("#hydration").val();
+                toString() { 
+                    return this.name; 
+                }
 
-                    var alkaloidData = dataset.alkaloids[alkaloidName];
-                    var anionSourceData = dataset.anions[anionSourceName];
-                    
-                    $("#outputTable tbody tr").remove();
-                    $.each(dataset["anions"], function(anionTargetName, anionTargetData){
-                        if (anionTargetName != anionSourceName) {
-                            for(var targetAnionStoichiometry = 1; targetAnionStoichiometry<=anionTargetData.protons; targetAnionStoichiometry++) {
-                                var ratioString = (targetAnionStoichiometry == 1) ? " " : ` ${targetAnionStoichiometry}:1 `;
-                                var targetCompound = `${alkaloidName}${ratioString}${anionTargetName}`;
-                                var targetMass = convertSalt(
-                                    sourceMass, 
-                                    alkaloidData.molarMass,
-                                    anionSourceData.molarMass,
-                                    anionSourceStoichiometry,
-                                    sourceHydration,
-                                    anionTargetData.molarMass,
-                                    targetAnionStoichiometry,
-                                    0
-                                );
+                get charges() { return Array.from(Array(this.maxCharge).keys(), i=>i+1); }
+            }
 
-                                $("#outputTable tbody").append(`
-                                    <tr>
-                                        <td class="massOutput">${targetMass.toPrecision(4)}</td>
-                                        <td>${targetCompound}</td>
-                                        <td class="targetHydration">
-                                            <input id="${anionTargetName}-${targetAnionStoichiometry}-hydration" type="number"/>
-                                        <td>
-                                    </tr>
-                                `);
-                            }
-                        }
+            class Acid extends Ion {
+                constructor(name, data) {
+                    super(name, data);
+                    this.protons = data.protons || 1;
+                }
+
+                get maxCharge() { return this.protons; }
+            }
+
+            class Alkaloid extends Ion {
+                constructor(name, data) {
+                    super(name, data)
+                    this.nitrogens = data.nitrogens || 1;
+                }
+
+                get maxCharge() { return this.nitrogens; }
+            }
+
+            class Salt {
+                constructor(alkaloid, x, acid, y, hydration) {
+                    this.alkaloid = alkaloid;
+                    this.nAlkaloid = x;
+                    this.acid = acid;
+                    this.nAcid = y;
+                    this.hydration = hydration
+                }
+                
+                static convert(mass, SaltA, SaltB){
+                    return SaltB.molesAlkaloidToMassSalt(SaltA.massToMolesAlkaloid(mass));
+                }
+
+                get molarMass() { 
+                    var alkaloidMass = this.alkaloid.molarMass * this.nAlkaloid;
+                    var acidMass = this.acid.molarMass * this.nAcid;
+                    var hydrationMass = waterMMass * this.hydration;
+                    return  alkaloidMass + acidMass + hydrationMass;
+                }
+
+                toString() {
+                    var ratioString = (this.nAlkaloid == 1 && this.nAcid == 1) ? " " : ` ${this.nAlkaloid}:${this.nAcid} `;
+                    var hydrationString = (this.hydration > 0) ? ` ${this.hydration}-hydrate` : "";
+                    return `${this.alkaloid}${ratioString}${this.acid}${hydrationString}`;
+                }
+
+                massToMolesSalt(mass) { return mass / this.molarMass; }
+
+                massToMolesAlkaloid(mass) { return this.massToMolesSalt(mass) * this.nAlkaloid; }
+
+                massToMassAlkaloid(mass) { return this.massToMolesAlkaloid(mass) * this.alkaloid.molarMass; }
+
+                molesSaltToMass(molesSalt) { return molesSalt * this.molarMass; }
+
+                molesAlkaloidToMolesSalt(molesAlkaloid) { return molesAlkaloid / this.nAlkaloid; }
+
+                molesAlkaloidToMass(molesAlkaloid) { return molesAlkaloid * this.alkaloid.molarMass; }
+
+                molesAlkaloidToMassSalt(molesAlkaloid) { return this.molarMass * molesAlkaloid / this.nAlkaloid }
+
+                calculateYieldPercent(rawMaterialMass, mass) {
+                    return 100 * this.massToMassAlkaloid(mass) / rawMaterialMass;
+                }
+
+                isConvertibleTo(saltB) {
+                    return this.alkaloid == saltB.alkaloid && (
+                        this.nAlkaloid != saltB.nAlkaloid ||
+                        this.acid != saltB.acid || 
+                        this.nAcid != saltB.nAcid ||
+                        this.hydration != saltB.hydration
+                    );
+                }
+            }
+        </script>
+
+        <script type="text/javascript">
+            function initializeIonOptions() {
+                $.each(dataset["alkaloids"], function(name, data){
+                    var option = $(new Option(name, name));
+                    option.data("ion", new Alkaloid(name, data));
+                    $("#alkaloid").append(option);
+                });
+                $.each(dataset["acids"], function(name, data){
+                    var option = $(new Option(name, name));
+                    option.data("ion", new Acid(name, data));
+                    $("#acid").append(option);
+                });
+
+                $("#alkaloid").first().select();
+                $("#acid").first().select();
+            }
+
+            function initializeRatios() {
+                var acid = $("#acid :selected").data("ion");
+                var $ratioSelector = $("#stoichiometry");
+
+                $ratioSelector.hide();
+                $ratioSelector.children().remove();
+
+                $.each(acid.charges, function(i, charge){
+                    var option = new Option(charge, charge);
+                    $ratioSelector.append(option);
+                })
+                $ratioSelector.first().select();
+
+                if (acid.maxCharge > 1) {
+                    $ratioSelector.show();
+                }
+            }
+
+            function initializeSaltOutputTable(){
+                var $tableBody = $("#outputTable tbody");
+
+                $("#alkaloid option").each(function(){
+                    var alkaloid = $(this).data("ion");
+                    $("#acid option").each(function(){
+                        var acid = $(this).data("ion");
+                        $.each(acid.charges, function(i, charge){
+                            var salt = new Salt(alkaloid, charge, acid, 1, 0);
+                            var $tableRow = $(`
+                            <tr class="salt">
+                                <td class="massOutput"></td>
+                                <td>${salt}</td>
+                                <td>
+                                    <input class="hydration" type="number" value=0 />
+                                </td>
+                            </tr>
+                            `);
+
+                            $tableRow.data("salt", salt);
+                            $tableBody.append($tableRow);
+                        });
                     });
-                    return true;
-                }
+                });
 
-                function populateRatios() {
-                    var anionName = $("#anion :selected").val();
-                    var protons = dataset.anions[anionName].protons;
-                    var $ratioSelector = $("#stoichiometry");
+                $tableBody.find("tr").hide();
+            };
 
-                    $ratioSelector.children(":not(:first-child)").remove();
-                    $ratioSelector.children().prop("selected", true);
+            function getSaltA() {
+                var alkaloid = $("#alkaloid :selected").data("ion");
+                var acid = $("#acid :selected").data("ion");
+                var acidACharge = $("#stoichiometry :selected").val();
+                var hydration = $("#hydration").val();
 
-                    for(var i=2; i<=protons; i++){
-                        $ratioSelector.append(`<option value=${i}>${i}:1</option>`);
-                    }
+                return new Salt(alkaloid, acidACharge, acid, 1, hydration);
+            }
 
-                    if (protons < 2){
-                        $ratioSelector.hide();
-                    } else {
-                        $ratioSelector.show();
-                    }
+            function calculateYield(){
+                var salt = getSaltA();
+                var rawMass = $("#rawMass").val();
+                var productMass = $("#mass").val();
+                
+                var percentYield = salt.calculateYieldPercent(rawMass, productMass);
 
-                    return true;
-                }
+                $("#yieldData").html(`
+                    <span class="bold">Yield:</span> ${percentYield.toPrecision(2)} % freebase ${salt.alkaloid}
+                `);
+            }
 
-                function calculateYields(){
-                    var rawMass = $("#rawMass").val();
-                    var sourceMass = $("#mass").val();
-                    var sourceHydration = $("#hydration").val();
-                    var alkaloidName = $("#alkaloid :selected").val();
-                    var anionSourceStoichiometry = $("#stoichiometry :selected").val();
-                    var anionSourceName = $("#anion :selected").val();
+            function convertSalts() {
+                var saltAMass = $("#mass").val();
+                var saltA = getSaltA();
+            
+                $(".salt").hide();
 
-                    var alkaloidData = dataset.alkaloids[alkaloidName];
-                    var anionSourceData = dataset.anions[anionSourceName];
+                //Get all salts that can be converted from salt A
+                var $targetSalts = $(".salt").filter(function(){
+                    var saltB = $(this).data("salt");
+                    return saltA.isConvertibleTo(saltB);
+                });
+                
+                $targetSalts.each(function(){
+                    var $saltRow = $(this);
+                    var saltB = $saltRow.data("salt");
+                    $saltRow.find(".massOutput").text(Salt.convert(saltAMass, saltA, saltB).toPrecision(4));
+                });
 
-                    var productMolarMass = alkaloidData.molarMass * anionSourceStoichiometry + anionSourceData.molarMass + waterMMass * sourceHydration;
-                    var productMoles = sourceMass / productMolarMass;
-                    var freebaseMoles = productMoles * anionSourceStoichiometry;
-                    var freebaseMass = freebaseMoles * alkaloidData.molarMass;
+                $targetSalts.show();
+            }
 
-                    var percentYield = 100 * freebaseMass / rawMass;
-                    
-                    $("#yieldData").html(`
-                    <span class="bold">Yield:</span> ${percentYield.toPrecision(2)} % freebase ${alkaloidName}
-                    `);
-                }
-
-                populateRatios();
+            function recalculateSaltB() {
+                var $hydrationInput = $(this);
+                var $targetRow = $hydrationInput.parents(".salt");
+                var salt = $targetRow.data("salt");
+                
+                salt.hydration = $hydrationInput.val();
                 convertSalts();
-                calculateYields();
+            }
 
-                $("#converterForm").change(function() {convertSalts();  calculateYields();});
-                $("#anion").change(populateRatios);
+            $(document).ready(function(){
+                initializeIonOptions();
+                initializeRatios();
+                initializeSaltOutputTable();
+                calculateYield();
+                convertSalts();
+
+                $("#converterForm").change(function() {convertSalts();  calculateYield();});
                 $('#converterForm').submit(false);
+
+                // When changing the acid selection, repopulate the ratios selector
+                $("#acid").change(initializeRatios());
+
+                $(".hydration").change(recalculateSaltB);
             });
         </script>
         <style>
@@ -157,7 +257,6 @@
             .formDiv {padding: 10px; }
             #outputTable { padding-top: 30px; padding-left: 5px; }
             #outputTable th { text-align: left; }
-            .targetHydration { display: none }
         </style>
     </head>
     <body>
@@ -168,7 +267,7 @@
                 <select id="stoichiometry">
                     <option value="1" selected>1:1</option>
                 </select>
-                <select id="anion" name="anion"></select>
+                <select id="acid" name="acid"></select>
                 <input id="hydration" type="number" value="0" />
                 <label for="hydration">hydrate</label>
             </div>
@@ -183,13 +282,12 @@
             <div id="yieldData" class="formDiv"></div>
         </form>
         <div>
-        <form id="outputHydrations">
+        <form id="saltConversions">
             <table id="outputTable">
                 <thead>
                     <tr>
                         <th width="180px">Mass (<span id="unit">g</span>)</th>
                         <th>Compound</th>
-                        <!--TODO: integrate this into --> 
                         <th class="targetHydration">Hydration</th>
                     </tr>
                 </thead>
