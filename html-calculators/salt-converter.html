@@ -11,23 +11,28 @@
                     "mescaline": { "molarMass": 211.26 },
                     "harmine": { "molarMass": 212.25 },
                     "harmaline": { "molarMass": 214.29 },
-                    "tetrahydroharman": { "molarMass": 186.25}
+                    "tetrahydroharman": { "molarMass": 186.25 }
                 },
                 "acids": {
-                    "freebase": {"molarMass": 0, "protons": 1 },
-                    "acetate": { "molarMass": 60.05, "protons": 1 },
-                    "ascorbate": { "molarMass": 176.12412, "protons": 1 },
-                    "benzoate": { "molarMass": 122.12134, "protons": 1 },
-                    "carbonate": { "molarMass": 62.02478, "protons": 1 },
+                    "freebase": {"molarMass": 0 },
+                    "acetate": { "molarMass": 60.05 },
+                    "ascorbate": { "molarMass": 176.12412 },
+                    "benzoate": { "molarMass": 122.12134 },
+                    "carbonate": { "molarMass": 62.02478 },
                     "citrate": { "molarMass": 192.12, "protons": 3 },
                     "fumarate": { "molarMass": 116.0722, "protons": 2 },
-                    "hydrochloride": { "molarMass": 36.46, "protons": 1 },
+                    "hydrochloride": { "molarMass": 36.46 },
                     "malate": { "molarMass": 134.09, "protons": 2 },
                     "maleate": { "molarMass": 116.072, "protons": 2 },
                     "malonate": { "molarMass": 104.061, "protons": 2 },
                     "succinate": { "molarMass": 118.09, "protons": 2 },
-                    "sulfate": { "molarMass": 98.08, "protons": 1 }, 
-                    "tartarate": {"molarMass": 150.08, "protons": 2}
+                    "sulfate": { "molarMass": 98.0 }, 
+                    "tartarate": {"molarMass": 150.08, "protons": 2 }
+                }, 
+                "hydrationDefaults": {
+                    "mescaline": {
+                        "sulfate": 2
+                    }
                 }
             }
         </script>
@@ -74,9 +79,14 @@
                     this.nAcid = y;
                     this.hydration = hydration
                 }
-                
+
                 static convert(mass, SaltA, SaltB){
                     return SaltB.molesAlkaloidToMassSalt(SaltA.massToMolesAlkaloid(mass));
+                }
+
+                static getDefaultHydration(alkaloid, acid) {
+                    var alkaloidDefaults = dataset["hydrationDefaults"][alkaloid.name] || {};
+                    return alkaloidDefaults[acid.name] || 0;
                 }
 
                 get molarMass() { 
@@ -164,13 +174,13 @@
                     $("#acid option").each(function(){
                         var acid = $(this).data("ion");
                         $.each(acid.charges, function(i, charge){
-                            var salt = new Salt(alkaloid, charge, acid, 1, 0);
+                            var salt = new Salt(alkaloid, charge, acid, 1, Salt.getDefaultHydration(alkaloid, acid));
                             var $tableRow = $(`
                             <tr class="salt">
                                 <td class="massOutput"></td>
                                 <td>${salt}</td>
                                 <td>
-                                    <input class="hydration" type="number" value="0" min="0" />
+                                    <input class="hydration" type="number" value="${salt.hydration}" min="0" />
                                 </td>
                             </tr>
                             `);
@@ -235,6 +245,10 @@
                 convertSalts();
             }
 
+            function updateHydration() {
+                
+            }
+
             $(document).ready(function(){
                 initializeIonOptions();
                 initializeRatios();
@@ -247,6 +261,11 @@
 
                 // When changing the acid selection, repopulate the ratios selector
                 $("#acid").change(initializeRatios);
+<<<<<<< HEAD
+=======
+
+                $("#acid, #alkaloid").change(updateHydration);
+>>>>>>> add support for hydration
 
                 $(".hydration").change(recalculateSaltB);
             });

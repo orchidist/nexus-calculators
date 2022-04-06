@@ -22,6 +22,10 @@ Choose the form of the alkaloid you have, then input the mass you have. The calc
 
 Some acids have the potential to bond with more than one alkaloid molecule. In many cases we are not certain which ratio we have. This calculator produces conversions between the different possible ratios to help deduce which ones actually exist.
 
+#### Water of crystallization
+
+Some salts incorporate water molecules in their crystal lattice, use the hydration fields to adjust for this variable.
+
 #### Calculating yield
 Choose the form of the alkaloid you're collecting using the drop downs, then insert the amount of raw material in grams, and the amount of final product in grams. The calculator will automatically account for the molecular weight of the acid used and return the yield in terms of the freebase alkaloid. 
 
