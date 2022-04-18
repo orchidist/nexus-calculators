@@ -96,6 +96,10 @@
                     return  alkaloidMass + acidMass + hydrationMass;
                 }
 
+                get defaultHydration() {
+                    return Salt.getDefaultHydration(this.alkaloid, this.acid);
+                }
+
                 toString() {
                     var ratioString = (this.nAlkaloid == 1 && this.nAcid == 1) ? " " : ` ${this.nAlkaloid}:${this.nAcid} `;
                     var hydrationString = (this.hydration > 0) ? ` ${this.hydration}-hydrate` : "";
@@ -246,7 +250,8 @@
             }
 
             function updateHydration() {
-                
+                var salt = getSaltA();
+                $("#hydration").val(salt.defaultHydration);
             }
 
             $(document).ready(function(){
@@ -260,12 +265,8 @@
                 $('#converterForm').submit(false);
 
                 // When changing the acid selection, repopulate the ratios selector
-                $("#acid").change(initializeRatios);
-<<<<<<< HEAD
-=======
-
-                $("#acid, #alkaloid").change(updateHydration);
->>>>>>> add support for hydration
+                $("#acid").change(function() {updateHydration(); initializeRatios()});
+                $("#alkaloid").change(updateHydration);
 
                 $(".hydration").change(recalculateSaltB);
             });
